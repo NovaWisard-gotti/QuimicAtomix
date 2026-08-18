@@ -2,6 +2,7 @@ package com.educalab.quimicatomix.data
 
 import androidx.test.core.app.ApplicationProvider
 import com.educalab.quimicatomix.data.local.AppDatabase
+import com.educalab.quimicatomix.data.local.entity.ChemicalTopic
 import com.educalab.quimicatomix.data.local.entity.MasteryState
 import com.educalab.quimicatomix.data.local.entity.Progress
 import com.educalab.quimicatomix.data.local.entity.UserProfile
@@ -23,6 +24,20 @@ class ProgressDaoTest {
     fun setUp() = runTest {
         db = AppDatabase.buildInMemory(ApplicationProvider.getApplicationContext())
         userId = db.userProfileDao().insert(UserProfile(alias = "Test", avatarId = 0, createdAt = 0L, lastActiveAt = 0L))
+        db.chemicalTopicDao().insertAll(
+            listOf(
+                ChemicalTopic(
+                    id = "estados",
+                    title = "Estados",
+                    shortDescription = "",
+                    narrativeIntro = "",
+                    iconKey = "",
+                    colorHex = "#000000",
+                    orderIndex = 0,
+                    minLevelToUnlock = 0
+                )
+            )
+        )
         db.progressDao().insertAll(
             listOf(Progress(userId = userId, topicId = "estados", experimentsTotal = 10, mastery = MasteryState.DISPONIBLE))
         )
