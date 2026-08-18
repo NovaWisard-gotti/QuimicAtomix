@@ -49,7 +49,7 @@ class OnboardingViewModel(private val container: AppContainer) : ViewModel() {
             val alias = _uiState.value.alias.ifBlank { "Explorador" }
             val userId = container.profileRepository.createProfile(alias, _uiState.value.avatarId)
             DatabaseSeeder.initializeProgressForUser(container.database, userId)
-            container.setActiveUser(userId)
+            container.switchProfile(userId)
             _uiState.update { it.copy(isCreatingProfile = false, finished = true) }
         }
     }

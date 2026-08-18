@@ -1,18 +1,19 @@
 package com.educalab.quimicatomix.ui.screens.experiment
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -21,59 +22,137 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.educalab.quimicatomix.data.local.entity.ExperimentStep
 import com.educalab.quimicatomix.data.local.entity.InteractionType
+import com.educalab.quimicatomix.ui.components.DraggableTile
+import com.educalab.quimicatomix.ui.components.IconCatalog
+import com.educalab.quimicatomix.ui.components.ObservationAnimation
+import com.educalab.quimicatomix.ui.components.VisualAnswerTile
+import com.educalab.quimicatomix.ui.components.registerDropZone
+import com.educalab.quimicatomix.ui.components.rememberDropZoneRegistry
 import com.educalab.quimicatomix.ui.theme.LabInk
 import com.educalab.quimicatomix.ui.theme.LabNavy700
+import com.educalab.quimicatomix.ui.theme.LabNavy800
 import com.educalab.quimicatomix.ui.theme.LabTeal500
 import com.educalab.quimicatomix.ui.theme.LabWhite
 
 /**
- * Interacción genérica de un paso de experimento. Traduce cada [InteractionType] en un
- * gesto de TOQUE real (seleccionar, ordenar por toques sucesivos, clasificar en grupos,
- * conectar pares) -sustituyendo el arrastre físico por una interacción táctil equivalente
- * y fiable en cualquier tamaño de pantalla-. Se documenta como simplificación deliberada
- * en docs/MANUAL_TECNICO.md.
+ * Interacción genérica de un paso de experimento: cada [InteractionType] se traduce en una
+ * interacción visual real (arrastrar y soltar imágenes, animación de observación, tarjetas
+ * ilustradas) en lugar de texto plano, reutilizando [VisualAnswerTile]/[DraggableTile] para
+ * que la mejora aplique automáticamente a los 55 experimentos semilla de todos los temas.
  */
 @Composable
 fun GenericStepInteraction(step: ExperimentStep, onSubmit: (String) -> Unit) {
     val options = remember(step.id) { step.optionsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() } }
 
     when (step.interactionType) {
-        InteractionType.ORDENAR -> OrderInteraction(options, onSubmit)
+        InteractionType.ORDENAR -> OrderInteraction(step.id, options, onSubmit)
         InteractionType.CLASIFICAR -> {
             val groupCount = remember(step.id) { step.correctAnswerCsv.split("|").size.coerceAtLeast(2) }
-            ClassifyInteraction(options, groupCount, onSubmit)
+            ClassifyInteraction(step.id, options, groupCount, onSubmit)
         }
-        InteractionType.CONECTAR -> ConnectInteraction(step.correctAnswerCsv, onSubmit)
-        else -> SelectInteraction(options, step.interactionType, onSubmit)
+        InteractionType.CONECTAR -> ConnectInteraction(step.id, step.correctAnswerCsv, onSubmit)
+        InteractionType.OBSERVAR -> ObserveInteraction(step, options, onSubmit)
+        else -> SelectInteraction(options, onSubmit)
+    }
+}
+
+/** Layout simple en filas de tarjetas, sin desplazamiento (evita conflictos de gesto con el arrastre). */
+@Composable
+private fun TileRows(items: List<String>, itemsPerRow: Int = 3, content: @Composable (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.chunked(itemsPerRow).forEach { rowItems ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                rowItems.forEach { item -> content(item) }
+            }
+        }
     }
 }
 
 @Composable
-private fun OrderInteraction(options: List<String>, onSubmit: (String) -> Unit) {
-    var sequence by remember { mutableStateOf(listOf<String>()) }
+private fun OrderInteraction(stepId: Long, options: List<String>, onSubmit: (String) -> Unit) {
+    var tray by remember(stepId) { mutableStateOf(options) }
+    var slots by remember(stepId) { mutableStateOf(List<String?>(options.size) { null }) }
+    val zones = rememberDropZoneRegistry()
+
     Column {
-        Text("Toca las opciones EN ORDEN:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.padding(top = 8.dp))
-        ChipFlow(items = options, disabledItems = sequence.toSet()) { picked ->
-            sequence = sequence + picked
+        Text("Arrastra cada elemento a su lugar, EN ORDEN:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.padding(top = 10.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())
+        ) {
+            slots.forEachIndexed { index, filled ->
+                Box(
+                    modifier = Modifier
+                        .width(92.dp)
+                        .height(124.dp)
+                        .registerDropZone("slot_$index", zones)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LabNavy800)
+                        .border(width = 1.dp, color = LabNavy700, shape = RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (filled != null) {
+                        VisualAnswerTile(
+                            label = filled,
+                            kind = IconCatalog.resolve(filled),
+                            tint = IconCatalog.colorFor(filled),
+                            selected = true,
+                            onClick = {
+                                slots = slots.toMutableList().also { it[index] = null }
+                                tray = tray + filled
+                            }
+                        )
+                    } else {
+                        Text("${index + 1}", color = LabWhite.copy(alpha = 0.35f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
-        Spacer(Modifier.padding(top = 12.dp))
-        Text("Tu secuencia: " + sequence.joinToString(" → ").ifEmpty { "(vacío)" }, color = LabWhite.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.padding(top = 12.dp))
+        Spacer(Modifier.padding(top = 16.dp))
+        if (tray.isNotEmpty()) {
+            Text("Opciones disponibles:", style = MaterialTheme.typography.bodyMedium, color = LabWhite.copy(alpha = 0.7f))
+            Spacer(Modifier.padding(top = 8.dp))
+        }
+        TileRows(items = tray) { item ->
+            DraggableTile(
+                label = item,
+                kind = IconCatalog.resolve(item),
+                tint = IconCatalog.colorFor(item),
+                zones = zones,
+                onDropped = { zoneId ->
+                    val index = zoneId?.removePrefix("slot_")?.toIntOrNull()
+                    if (index != null && slots.getOrNull(index) == null) {
+                        slots = slots.toMutableList().also { it[index] = item }
+                        tray = tray - item
+                    }
+                }
+            )
+        }
+        Spacer(Modifier.padding(top = 16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = { sequence = emptyList() }) { Text("Reiniciar") }
+            OutlinedButton(onClick = {
+                slots = List(options.size) { null }
+                tray = options
+            }) { Text("Reiniciar") }
             Button(
-                onClick = { onSubmit(sequence.joinToString(",")) },
-                enabled = sequence.size == options.size,
+                onClick = { onSubmit(slots.joinToString(",") { it.orEmpty() }) },
+                enabled = slots.none { it == null },
                 colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
             ) { Text("Comprobar", fontWeight = FontWeight.Bold) }
         }
@@ -81,68 +160,150 @@ private fun OrderInteraction(options: List<String>, onSubmit: (String) -> Unit) 
 }
 
 @Composable
-private fun ClassifyInteraction(options: List<String>, groupCount: Int, onSubmit: (String) -> Unit) {
-    // -1 = sin asignar; 0..groupCount-1 = grupo asignado
-    var assignment by remember { mutableStateOf(options.associateWith { -1 }) }
-    val groupLabels = remember(groupCount) { (1..groupCount).map { "Grupo $it" } }
+private fun ClassifyInteraction(stepId: Long, options: List<String>, groupCount: Int, onSubmit: (String) -> Unit) {
+    var tray by remember(stepId) { mutableStateOf(options) }
+    var assignment by remember(stepId) { mutableStateOf(mapOf<String, Int>()) }
+    val zones = rememberDropZoneRegistry()
+
+    fun unassign(item: String) {
+        assignment = assignment - item
+        tray = tray + item
+    }
 
     Column {
-        Text("Toca cada elemento para asignarlo a un grupo:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.padding(top = 8.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.wrapContentWidth()) {
-            items(options) { option ->
-                val group = assignment[option] ?: -1
-                val label = if (group == -1) option else "$option → ${groupLabels[group]}"
-                Chip(text = label, selected = group != -1, modifier = Modifier.padding(4.dp)) {
-                    assignment = assignment.toMutableMap().apply { this[option] = if (group + 1 >= groupCount) -1 else group + 1 }
+        Text("Arrastra cada elemento a su grupo:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.padding(top = 10.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            (0 until groupCount).forEach { groupIndex ->
+                val groupItems = assignment.filterValues { it == groupIndex }.keys.toList()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .registerDropZone("group_$groupIndex", zones)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LabNavy800)
+                        .border(width = 1.dp, color = LabNavy700, shape = RoundedCornerShape(16.dp))
+                        .padding(10.dp)
+                ) {
+                    Text("Grupo ${groupIndex + 1}", style = MaterialTheme.typography.labelLarge, color = LabWhite.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.padding(top = 6.dp))
+                    if (groupItems.isEmpty()) {
+                        Text("Suelta aquí", color = LabWhite.copy(alpha = 0.3f), style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        TileRows(items = groupItems, itemsPerRow = 3) { item ->
+                            VisualAnswerTile(
+                                label = item,
+                                kind = IconCatalog.resolve(item),
+                                tint = IconCatalog.colorFor(item),
+                                selected = true,
+                                onClick = { unassign(item) }
+                            )
+                        }
+                    }
                 }
             }
         }
-        Spacer(Modifier.padding(top = 12.dp))
-        val allAssigned = assignment.values.none { it == -1 }
+        Spacer(Modifier.padding(top = 16.dp))
+        if (tray.isNotEmpty()) {
+            Text("Opciones disponibles:", style = MaterialTheme.typography.bodyMedium, color = LabWhite.copy(alpha = 0.7f))
+            Spacer(Modifier.padding(top = 8.dp))
+        }
+        TileRows(items = tray) { item ->
+            DraggableTile(
+                label = item,
+                kind = IconCatalog.resolve(item),
+                tint = IconCatalog.colorFor(item),
+                zones = zones,
+                onDropped = { zoneId ->
+                    val groupIndex = zoneId?.removePrefix("group_")?.toIntOrNull()
+                    if (groupIndex != null) {
+                        assignment = assignment + (item to groupIndex)
+                        tray = tray - item
+                    }
+                }
+            )
+        }
+        Spacer(Modifier.padding(top = 16.dp))
         Button(
             onClick = {
-                val groups = (0 until groupCount).map { g ->
-                    assignment.filterValues { it == g }.keys.joinToString(",")
-                }
+                val groups = (0 until groupCount).map { g -> assignment.filterValues { it == g }.keys.joinToString(",") }
                 onSubmit(groups.joinToString("|"))
             },
-            enabled = allAssigned,
+            enabled = assignment.size == options.size,
             colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
         ) { Text("Comprobar", fontWeight = FontWeight.Bold) }
     }
 }
 
 @Composable
-private fun ConnectInteraction(correctAnswerCsv: String, onSubmit: (String) -> Unit) {
-    val pairs = remember(correctAnswerCsv) { correctAnswerCsv.split(",").map { it.split("-") } }
-    val lefts = remember(pairs) { pairs.map { it[0] }.shuffled() }
-    val rights = remember(pairs) { pairs.map { it.getOrElse(1) { "" } }.shuffled() }
+private fun ConnectInteraction(stepId: Long, correctAnswerCsv: String, onSubmit: (String) -> Unit) {
+    val pairs = remember(stepId) { correctAnswerCsv.split(",").map { it.split("-") } }
+    val lefts = remember(stepId) { pairs.map { it[0] }.shuffled() }
+    val rights = remember(stepId) { pairs.map { it.getOrElse(1) { "" } }.shuffled() }
 
-    var selectedLeft by remember { mutableStateOf<String?>(null) }
-    var connections by remember { mutableStateOf(mapOf<String, String>()) }
+    var selectedLeft by remember(stepId) { mutableStateOf<String?>(null) }
+    var connections by remember(stepId) { mutableStateOf(mapOf<String, String>()) }
+    val itemCenters = remember(stepId) { mutableStateMapOf<String, Offset>() }
+    var containerOrigin by remember { mutableStateOf(Offset.Zero) }
 
     Column {
         Text("Toca un elemento izquierdo y luego su pareja correcta:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.padding(top = 8.dp))
-        Row {
-            Column(modifier = Modifier.weight(1f)) {
-                lefts.forEach { left ->
-                    val connected = connections.containsKey(left)
-                    Chip(text = left, selected = selectedLeft == left || connected, modifier = Modifier.padding(4.dp).fillMaxWidth()) {
-                        if (!connected) selectedLeft = left
+        Spacer(Modifier.padding(top = 10.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { containerOrigin = it.boundsInWindow().topLeft }
+        ) {
+            Row {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    lefts.forEach { left ->
+                        val connected = connections.containsKey(left)
+                        VisualAnswerTile(
+                            label = left,
+                            kind = IconCatalog.resolve(left),
+                            tint = IconCatalog.colorFor(left),
+                            selected = selectedLeft == left || connected,
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .onGloballyPositioned { itemCenters["L_$left"] = it.boundsInWindow().center },
+                            onClick = { if (!connected) selectedLeft = left }
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    rights.forEach { right ->
+                        val used = connections.containsValue(right)
+                        VisualAnswerTile(
+                            label = right,
+                            kind = IconCatalog.resolve(right),
+                            tint = IconCatalog.colorFor(right),
+                            selected = used,
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .onGloballyPositioned { itemCenters["R_$right"] = it.boundsInWindow().center },
+                            onClick = {
+                                val left = selectedLeft
+                                if (left != null && !used) {
+                                    connections = connections + (left to right)
+                                    selectedLeft = null
+                                }
+                            }
+                        )
                     }
                 }
             }
-            Column(modifier = Modifier.weight(1f)) {
-                rights.forEach { right ->
-                    val used = connections.containsValue(right)
-                    Chip(text = right, selected = used, modifier = Modifier.padding(4.dp).fillMaxWidth()) {
-                        val left = selectedLeft
-                        if (left != null && !used) {
-                            connections = connections + (left to right)
-                            selectedLeft = null
-                        }
+            Canvas(modifier = Modifier.matchParentSize()) {
+                connections.forEach { (left, right) ->
+                    val a = itemCenters["L_$left"]
+                    val b = itemCenters["R_$right"]
+                    if (a != null && b != null) {
+                        drawLine(
+                            color = LabTeal500,
+                            start = a - containerOrigin,
+                            end = b - containerOrigin,
+                            strokeWidth = 6f,
+                            cap = StrokeCap.Round
+                        )
                     }
                 }
             }
@@ -157,68 +318,41 @@ private fun ConnectInteraction(correctAnswerCsv: String, onSubmit: (String) -> U
 }
 
 @Composable
-private fun SelectInteraction(options: List<String>, type: InteractionType, onSubmit: (String) -> Unit) {
-    var selected by remember { mutableStateOf(setOf<String>()) }
+private fun ObserveInteraction(step: ExperimentStep, options: List<String>, onSubmit: (String) -> Unit) {
+    Column {
+        ObservationAnimation(
+            instructionText = step.instruction,
+            optionsCsv = step.optionsCsv,
+            correctAnswerCsv = step.correctAnswerCsv,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.padding(top = 12.dp))
+        SelectInteraction(options, onSubmit)
+    }
+}
+
+@Composable
+private fun SelectInteraction(options: List<String>, onSubmit: (String) -> Unit) {
+    var selected by remember(options) { mutableStateOf(setOf<String>()) }
     Column {
         Text("Selecciona tu respuesta:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.padding(top = 8.dp))
-        ChipFlow(items = options, selectedItems = selected) { picked ->
-            selected = if (selected.contains(picked)) selected - picked else selected + picked
+        Spacer(Modifier.padding(top = 10.dp))
+        TileRows(items = options) { option ->
+            VisualAnswerTile(
+                label = option,
+                kind = IconCatalog.resolve(option),
+                tint = IconCatalog.colorFor(option),
+                selected = option in selected,
+                onClick = {
+                    selected = if (option in selected) selected - option else selected + option
+                }
+            )
         }
-        Spacer(Modifier.padding(top = 12.dp))
+        Spacer(Modifier.padding(top = 16.dp))
         Button(
             onClick = { onSubmit(selected.joinToString(",")) },
             enabled = selected.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
         ) { Text("Comprobar", fontWeight = FontWeight.Bold) }
-    }
-}
-
-@Composable
-private fun ChipFlow(
-    items: List<String>,
-    disabledItems: Set<String> = emptySet(),
-    selectedItems: Set<String> = emptySet(),
-    onPick: (String) -> Unit
-) {
-    LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 120.dp)) {
-        items(items) { item ->
-            val disabled = item in disabledItems
-            Chip(
-                text = item,
-                selected = item in selectedItems,
-                enabled = !disabled,
-                modifier = Modifier.padding(4.dp)
-            ) { onPick(item) }
-        }
-    }
-}
-
-@Composable
-private fun Chip(
-    text: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) LabTeal500 else LabNavy700)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = enabled,
-                onClick = onClick
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Text(
-            text.replace('_', ' '),
-            color = if (selected) LabInk else LabWhite.copy(alpha = if (enabled) 1f else 0.4f),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-        )
     }
 }

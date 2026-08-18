@@ -1,6 +1,7 @@
 package com.educalab.quimicatomix
 
 import android.content.Context
+import com.educalab.quimicatomix.data.local.ActiveProfileStore
 import com.educalab.quimicatomix.data.local.AppDatabase
 import com.educalab.quimicatomix.data.repository.ContentRepository
 import com.educalab.quimicatomix.data.repository.GamificationRepository
@@ -16,6 +17,7 @@ import com.educalab.quimicatomix.util.SoundHapticsManager
 class AppContainer(context: Context) {
 
     val database: AppDatabase = AppDatabase.getInstance(context)
+    val activeProfileStore: ActiveProfileStore = ActiveProfileStore(context)
 
     /** Id del perfil activo en esta sesión. Se establece durante el arranque o el onboarding. */
     var currentUserId: Long = NO_USER
@@ -23,6 +25,13 @@ class AppContainer(context: Context) {
 
     fun setActiveUser(userId: Long) {
         currentUserId = userId
+    }
+
+    /** Cambia de perfil activo (usado al alternar entre perfiles o crear uno nuevo) y lo recuerda. */
+    suspend fun switchProfile(userId: Long) {
+        currentUserId = userId
+        profileRepository.touch(userId)
+        activeProfileStore.save(userId)
     }
 
     val profileRepository: ProfileRepository by lazy {
@@ -65,8 +74,11 @@ class AppContainer(context: Context) {
         com.educalab.quimicatomix.data.seed.DatabaseSeeder.seedIfNeeded(database)
         val hasProfile = profileRepository.hasProfile()
         if (hasProfile) {
-            currentUserId = profileRepository.getOrCreateDefaultId()
+            val storedId = activeProfileStore.read()
+            val storedProfile = storedId?.let { profileRepository.getProfile(it) }
+            currentUserId = storedProfile?.id ?: profileRepository.getOrCreateDefaultId()
             profileRepository.touch(currentUserId)
+            activeProfileStore.save(currentUserId)
         }
         return hasProfile
     }

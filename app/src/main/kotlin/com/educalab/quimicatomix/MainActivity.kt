@@ -45,6 +45,7 @@ private fun QuimicAtomixRoot() {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as QuimicAtomixApp
     var isReady by remember { mutableStateOf(false) }
     var hasExistingProfile by remember { mutableStateOf(false) }
+    var profileEpoch by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
         hasExistingProfile = app.container.bootstrap()
@@ -57,7 +58,9 @@ private fun QuimicAtomixRoot() {
     }
 
     val start = if (hasExistingProfile) Routes.HOME else Routes.ONBOARDING
-    QuimicAtomixNavGraph(startDestination = start)
+    androidx.compose.runtime.key(profileEpoch) {
+        QuimicAtomixNavGraph(startDestination = start, onProfileChanged = { profileEpoch++ })
+    }
 }
 
 @Composable

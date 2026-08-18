@@ -12,6 +12,7 @@ object Routes {
     const val SAFETY_PLAY = "safety/{scenarioId}"
     const val PROGRESS_EQUIPMENT = "progress_equipment"
     const val PROFILE = "profile"
+    const val CREATE_PROFILE = "create_profile"
 
     fun topicDetail(topicId: String) = "topic/$topicId"
     fun experimentPlay(experimentId: String) = "experiment/$experimentId"

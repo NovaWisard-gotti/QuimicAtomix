@@ -47,11 +47,15 @@ object IconCatalog {
             "aux" in k || "auxilio" in k -> IllustrationKind.FIRST_AID
             "academia" in k || "book" in k || "libro" in k -> IllustrationKind.BOOK
             "mapa" in k || "map" in k || "progreso" in k -> IllustrationKind.MAP
-            "hielo" in k || "ice" in k -> IllustrationKind.ICE_CUBE
-            "vapor" in k || "steam" in k -> IllustrationKind.STEAM_CLOUD
-            "mezcla" in k || "burbuja" in k || "bubble" in k || "jabon" in k -> IllustrationKind.BUBBLE_JAR
+            "hielo" in k || "ice" in k || "solid" in k || "congela" in k -> IllustrationKind.ICE_CUBE
+            "vapor" in k || "steam" in k || "evapora" in k || "gaseoso" in k -> IllustrationKind.STEAM_CLOUD
+            "mezcla" in k || "burbuja" in k || "bubble" in k || "jabon" in k || "efervescen" in k || "espuma" in k -> IllustrationKind.BUBBLE_JAR
             "tabla" in k || "periodic" in k -> IllustrationKind.PERIODIC_CARD
-            "gota" in k || "aceite" in k || "colorante" in k || "vinagre" in k || "droplet" in k -> IllustrationKind.DROPLET
+            "gota" in k || "aceite" in k || "colorante" in k || "vinagre" in k || "droplet" in k || "liquid" in k || "derrit" in k || "fusion" in k -> IllustrationKind.DROPLET
+            "oxid" in k -> IllustrationKind.CORROSIVE
+            "capa" in k || "electron" in k || "proton" in k || "nucleo" in k -> IllustrationKind.ATOM
+            "condensa" in k -> IllustrationKind.DROPLET
+            "endurece" in k || "cera" in k -> IllustrationKind.ICE_CUBE
             else -> IllustrationKind.ATOM
         }
     }

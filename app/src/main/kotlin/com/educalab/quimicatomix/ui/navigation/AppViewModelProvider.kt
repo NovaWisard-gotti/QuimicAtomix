@@ -11,6 +11,7 @@ import com.educalab.quimicatomix.ui.screens.experiment.ExperimentPlayViewModel
 import com.educalab.quimicatomix.ui.screens.home.HomeViewModel
 import com.educalab.quimicatomix.ui.screens.molecule.MoleculeBuilderViewModel
 import com.educalab.quimicatomix.ui.screens.onboarding.OnboardingViewModel
+import com.educalab.quimicatomix.ui.screens.profile.CreateProfileViewModel
 import com.educalab.quimicatomix.ui.screens.profile.ProfileViewModel
 import com.educalab.quimicatomix.ui.screens.safety.SafetyViewModel
 import com.educalab.quimicatomix.ui.screens.topic.TopicDetailViewModel
@@ -45,6 +46,9 @@ object AppViewModelProvider {
         }
         initializer {
             ProfileViewModel(quimicAtomixApplication().container)
+        }
+        initializer {
+            CreateProfileViewModel(quimicAtomixApplication().container)
         }
     }
 }

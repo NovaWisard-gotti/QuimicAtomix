@@ -11,9 +11,15 @@ import kotlinx.coroutines.launch
 
 class ProfileViewModel(private val container: AppContainer) : ViewModel() {
 
+    val activeProfileId: Long get() = container.currentUserId
+
     val profile: StateFlow<UserProfile?> = container.profileRepository
         .observeProfile(container.currentUserId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val profiles: StateFlow<List<UserProfile>> = container.profileRepository
+        .observeAllProfiles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setSoundEnabled(enabled: Boolean) {
         viewModelScope.launch { container.profileRepository.setSoundEnabled(container.currentUserId, enabled) }
@@ -21,5 +27,13 @@ class ProfileViewModel(private val container: AppContainer) : ViewModel() {
 
     fun setHapticsEnabled(enabled: Boolean) {
         viewModelScope.launch { container.profileRepository.setHapticsEnabled(container.currentUserId, enabled) }
+    }
+
+    fun switchProfile(id: Long, onSwitched: () -> Unit) {
+        if (id == container.currentUserId) return
+        viewModelScope.launch {
+            container.switchProfile(id)
+            onSwitched()
+        }
     }
 }

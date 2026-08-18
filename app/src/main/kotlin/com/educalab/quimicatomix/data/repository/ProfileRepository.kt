@@ -33,6 +33,8 @@ class ProfileRepository(private val userProfileDao: UserProfileDao) {
 
     fun observeProfile(userId: Long): Flow<UserProfile?> = userProfileDao.observe(userId)
 
+    fun observeAllProfiles(): Flow<List<UserProfile>> = userProfileDao.observeAll()
+
     suspend fun getProfile(userId: Long): UserProfile? = userProfileDao.getById(userId)
 
     suspend fun touch(userId: Long) = userProfileDao.touch(userId, System.currentTimeMillis())

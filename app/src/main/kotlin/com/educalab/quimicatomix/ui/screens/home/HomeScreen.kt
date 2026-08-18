@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -118,25 +119,19 @@ fun HomeScreen(
                 )
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    QuickAccessTile(
-                        title = "Constructor",
-                        icon = Icons.Filled.Science,
-                        modifier = Modifier.weight(1f),
-                        onClick = onOpenMolecules
-                    )
-                    QuickAccessTile(
-                        title = "Seguridad",
-                        icon = Icons.Filled.Shield,
-                        modifier = Modifier.weight(1f),
-                        onClick = onOpenSafety
-                    )
-                    QuickAccessTile(
-                        title = "Progreso",
-                        icon = Icons.Filled.WorkspacePremium,
-                        modifier = Modifier.weight(1f),
-                        onClick = onOpenProgress
-                    )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp)
+                ) {
+                    item {
+                        QuickAccessTile(title = "Constructor", icon = Icons.Filled.Science, onClick = onOpenMolecules)
+                    }
+                    item {
+                        QuickAccessTile(title = "Seguridad", icon = Icons.Filled.Shield, onClick = onOpenSafety)
+                    }
+                    item {
+                        QuickAccessTile(title = "Progreso", icon = Icons.Filled.WorkspacePremium, onClick = onOpenProgress)
+                    }
                 }
             }
             item { Spacer(Modifier.height(8.dp)) }
@@ -173,8 +168,9 @@ private fun HomeHeader(aliasText: String, avatarId: Int, level: Int, onOpenProfi
 
 @Composable
 private fun QuickAccessTile(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Row(
+    Column(
         modifier = modifier
+            .width(96.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(LabNavy800)
             .clickable(
@@ -182,11 +178,26 @@ private fun QuickAccessTile(title: String, icon: androidx.compose.ui.graphics.ve
                 indication = null,
                 onClick = onClick
             )
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 14.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(icon, contentDescription = null, tint = LabWhite, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.padding(start = 8.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(LabNavy900),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = LabWhite, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.padding(top = 8.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = LabWhite,
+            fontWeight = FontWeight.Bold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 2
+        )
     }
 }

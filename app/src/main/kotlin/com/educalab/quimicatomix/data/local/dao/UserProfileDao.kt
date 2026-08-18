@@ -15,6 +15,9 @@ interface UserProfileDao {
     @Query("SELECT * FROM user_profile WHERE id = :id")
     fun observe(id: Long): Flow<UserProfile?>
 
+    @Query("SELECT * FROM user_profile ORDER BY lastActiveAt DESC")
+    fun observeAll(): Flow<List<UserProfile>>
+
     @Query("SELECT * FROM user_profile WHERE id = :id")
     suspend fun getById(id: Long): UserProfile?
 

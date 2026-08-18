@@ -1,17 +1,17 @@
 package com.educalab.quimicatomix.ui.screens.safety
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,10 +31,9 @@ import com.educalab.quimicatomix.ui.components.IconCatalog
 import com.educalab.quimicatomix.ui.components.LabIllustration
 import com.educalab.quimicatomix.ui.components.QuimiMood
 import com.educalab.quimicatomix.ui.components.QuimiSpeechBubble
+import com.educalab.quimicatomix.ui.components.VisualAnswerTile
 import com.educalab.quimicatomix.ui.navigation.AppViewModelProvider
-import com.educalab.quimicatomix.ui.theme.LabInk
 import com.educalab.quimicatomix.ui.theme.LabNavy900
-import com.educalab.quimicatomix.ui.theme.LabTeal500
 import com.educalab.quimicatomix.ui.theme.LabWhite
 
 @Composable
@@ -48,7 +47,7 @@ fun SafetyPlayScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(LabNavy900)) {
         BackgroundDecor()
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = "Volver", tint = LabWhite)
@@ -74,12 +73,20 @@ fun SafetyPlayScreen(
             } else {
                 Text("¿Qué harías en esta situación?", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.padding(top = 12.dp))
-                state.options.forEach { option ->
-                    Button(
-                        onClick = { viewModel.answer(option) },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
-                    ) { Text(option, fontWeight = FontWeight.Bold) }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.options.chunked(3).forEach { rowOptions ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            rowOptions.forEach { option ->
+                                VisualAnswerTile(
+                                    label = option,
+                                    kind = IconCatalog.resolve(option),
+                                    tint = IconCatalog.colorFor(option),
+                                    selected = false,
+                                    onClick = { viewModel.answer(option) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -11,13 +11,18 @@ import com.educalab.quimicatomix.ui.screens.home.HomeScreen
 import com.educalab.quimicatomix.ui.screens.molecule.MoleculeBuilderScreen
 import com.educalab.quimicatomix.ui.screens.molecule.MoleculeHubScreen
 import com.educalab.quimicatomix.ui.screens.onboarding.OnboardingScreen
+import com.educalab.quimicatomix.ui.screens.profile.CreateProfileScreen
 import com.educalab.quimicatomix.ui.screens.profile.ProfileScreen
 import com.educalab.quimicatomix.ui.screens.safety.SafetyHubScreen
 import com.educalab.quimicatomix.ui.screens.safety.SafetyPlayScreen
 import com.educalab.quimicatomix.ui.screens.topic.TopicDetailScreen
 
 @Composable
-fun QuimicAtomixNavGraph(startDestination: String, navController: NavHostController = rememberNavController()) {
+fun QuimicAtomixNavGraph(
+    startDestination: String,
+    navController: NavHostController = rememberNavController(),
+    onProfileChanged: () -> Unit = {}
+) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
@@ -77,7 +82,17 @@ fun QuimicAtomixNavGraph(startDestination: String, navController: NavHostControl
             ProgressEquipmentScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.PROFILE) {
-            ProfileScreen(onBack = { navController.popBackStack() })
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onCreateProfile = { navController.navigate(Routes.CREATE_PROFILE) },
+                onProfileChanged = onProfileChanged
+            )
+        }
+        composable(Routes.CREATE_PROFILE) {
+            CreateProfileScreen(
+                onBack = { navController.popBackStack() },
+                onCreated = onProfileChanged
+            )
         }
     }
 }
