@@ -136,7 +136,8 @@ fun DraggableTile(
     onDropped: (zoneId: String?) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val offsetAnim = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val offsetX = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(0f) }
     var restingOrigin by remember { mutableStateOf(Offset.Zero) }
     var tileSize by remember { mutableStateOf(Size.Zero) }
     var dragging by remember { mutableStateOf(false) }
@@ -146,7 +147,7 @@ fun DraggableTile(
             .onGloballyPositioned { coordinates ->
                 val bounds = coordinates.boundsInWindow()
                 tileSize = bounds.size
-                restingOrigin = Offset(bounds.left - offsetAnim.value.x, bounds.top - offsetAnim.value.y)
+                restingOrigin = Offset(bounds.left - offsetX.value, bounds.top - offsetY.value)
             }
             .then(
                 if (enabled) {
@@ -156,29 +157,31 @@ fun DraggableTile(
                             onDragEnd = {
                                 dragging = false
                                 val center = Offset(
-                                    restingOrigin.x + offsetAnim.value.x + tileSize.width / 2f,
-                                    restingOrigin.y + offsetAnim.value.y + tileSize.height / 2f
+                                    restingOrigin.x + offsetX.value + tileSize.width / 2f,
+                                    restingOrigin.y + offsetY.value + tileSize.height / 2f
                                 )
                                 val hitZone = zones.entries.firstOrNull { (_, rect) -> rect.contains(center) }?.key
-                                scope.launch {
-                                    offsetAnim.animateTo(Offset.Zero, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-                                    onDropped(hitZone)
-                                }
+                                val snapSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy)
+                                scope.launch { offsetX.animateTo(0f, animationSpec = snapSpec) }
+                                scope.launch { offsetY.animateTo(0f, animationSpec = snapSpec) }
+                                onDropped(hitZone)
                             },
                             onDragCancel = {
                                 dragging = false
-                                scope.launch { offsetAnim.snapTo(Offset.Zero) }
+                                scope.launch { offsetX.snapTo(0f) }
+                                scope.launch { offsetY.snapTo(0f) }
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                scope.launch { offsetAnim.snapTo(offsetAnim.value + dragAmount) }
+                                scope.launch { offsetX.snapTo(offsetX.value + dragAmount.x) }
+                                scope.launch { offsetY.snapTo(offsetY.value + dragAmount.y) }
                             }
                         )
                     }
                 } else Modifier
             )
             .offset {
-                IntOffset(offsetAnim.value.x.roundToInt(), offsetAnim.value.y.roundToInt())
+                IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt())
             }
             .zIndex(if (dragging) 4f else 0f)
     ) {
