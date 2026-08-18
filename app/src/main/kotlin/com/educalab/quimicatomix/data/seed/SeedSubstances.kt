@@ -1,0 +1,32 @@
+// ============================================================================
+// ARCHIVO GENERADO POR tools/generate_seed.py — NO EDITAR A MANO.
+// Para cambiar contenido, edita el script generador y vuelve a ejecutarlo.
+// ============================================================================
+
+package com.educalab.quimicatomix.data.seed
+
+import com.educalab.quimicatomix.data.local.entity.MatterState
+import com.educalab.quimicatomix.data.local.entity.VirtualSubstance
+
+object SeedSubstances {
+    val list: List<VirtualSubstance> = listOf(
+        VirtualSubstance(id="agua", topicId="estados", name="Agua", symbolOrFormula="H2O", state=MatterState.LIQUIDO, colorHex="#4FC3F7", description="Líquido transparente esencial para la vida. Cambia de estado con la temperatura.", iconKey="sub_agua", isMiscible=true, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="hielo", topicId="estados", name="Hielo", symbolOrFormula="H2O (sólido)", state=MatterState.SOLIDO, colorHex="#B3E5FC", description="Agua en estado sólido. Sus partículas están muy ordenadas y casi no se mueven.", iconKey="sub_hielo", isMiscible=false, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="vapor_agua", topicId="estados", name="Vapor de agua", symbolOrFormula="H2O (gas)", state=MatterState.GASEOSO, colorHex="#ECEFF1", description="Agua en estado gaseoso. Sus partículas se mueven libremente y ocupan más espacio.", iconKey="sub_vapor", isMiscible=false, isMagneticConceptual=false, densityTier=1),
+        VirtualSubstance(id="mantequilla", topicId="estados", name="Mantequilla", symbolOrFormula="Mezcla de grasas", state=MatterState.SOLIDO, colorHex="#FFE082", description="Sólido blando a temperatura ambiente que se derrite fácilmente con el calor.", iconKey="sub_mantequilla", isMiscible=false, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="chocolate", topicId="estados", name="Chocolate", symbolOrFormula="Mezcla de cacao", state=MatterState.SOLIDO, colorHex="#8D6E63", description="Sólido que cambia a líquido al calentarse y vuelve a solidificar al enfriarse.", iconKey="sub_chocolate", isMiscible=false, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="cera_vela", topicId="estados", name="Cera", symbolOrFormula="Hidrocarburos sólidos", state=MatterState.SOLIDO, colorHex="#FFF9C4", description="Sólido que se ablanda y derrite con el calor; al enfriarse, vuelve a endurecerse.", iconKey="sub_cera", isMiscible=false, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="arena", topicId="mezclas", name="Arena", symbolOrFormula="SiO2 (principalmente)", state=MatterState.SOLIDO, colorHex="#D7B98E", description="Granos sólidos diminutos. No se disuelve en agua.", iconKey="sub_arena", isMiscible=false, isMagneticConceptual=false, densityTier=3),
+        VirtualSubstance(id="aceite", topicId="mezclas", name="Aceite vegetal", symbolOrFormula="Triglicéridos", state=MatterState.LIQUIDO, colorHex="#FFD54F", description="Líquido que no se mezcla con el agua y flota sobre ella.", iconKey="sub_aceite", isMiscible=false, isMagneticConceptual=false, densityTier=1),
+        VirtualSubstance(id="sal", topicId="mezclas", name="Sal de mesa", symbolOrFormula="NaCl", state=MatterState.SOLIDO, colorHex="#F5F5F5", description="Sólido cristalino que se disuelve por completo en agua.", iconKey="sub_sal", isMiscible=true, isMagneticConceptual=false, densityTier=3),
+        VirtualSubstance(id="azucar", topicId="mezclas", name="Azúcar", symbolOrFormula="Sacarosa", state=MatterState.SOLIDO, colorHex="#FFF3E0", description="Sólido dulce que se disuelve fácilmente en agua.", iconKey="sub_azucar", isMiscible=true, isMagneticConceptual=false, densityTier=3),
+        VirtualSubstance(id="limaduras_hierro", topicId="mezclas", name="Limaduras de hierro", symbolOrFormula="Fe", state=MatterState.SOLIDO, colorHex="#9E9E9E", description="Trocitos diminutos de hierro. No se disuelven, pero un imán los atrae.", iconKey="sub_hierro", isMiscible=false, isMagneticConceptual=true, densityTier=3),
+        VirtualSubstance(id="corcho", topicId="mezclas", name="Corcho", symbolOrFormula="Material vegetal", state=MatterState.SOLIDO, colorHex="#D2A679", description="Sólido muy liviano que flota fácilmente en el agua.", iconKey="sub_corcho", isMiscible=false, isMagneticConceptual=false, densityTier=1),
+        VirtualSubstance(id="piedritas", topicId="mezclas", name="Piedritas", symbolOrFormula="Minerales variados", state=MatterState.SOLIDO, colorHex="#8E8E8E", description="Sólidos duros y pesados que se hunden en el agua.", iconKey="sub_piedritas", isMiscible=false, isMagneticConceptual=false, densityTier=3),
+        VirtualSubstance(id="colorante", topicId="mezclas", name="Colorante alimentario", symbolOrFormula="Pigmento soluble", state=MatterState.LIQUIDO, colorHex="#E91E63", description="Líquido de color intenso que se mezcla por completo con el agua.", iconKey="sub_colorante", isMiscible=true, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="harina", topicId="mezclas", name="Harina", symbolOrFormula="Almidón y proteínas", state=MatterState.SOLIDO, colorHex="#FFFDE7", description="Polvo fino que forma una mezcla turbia y espesa con el agua, sin disolverse del todo.", iconKey="sub_harina", isMiscible=false, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="jabon_liquido", topicId="mezclas", name="Jabón líquido", symbolOrFormula="Tensioactivos", state=MatterState.LIQUIDO, colorHex="#B2EBF2", description="Líquido resbaladizo que se mezcla por completo con el agua y hace espuma.", iconKey="sub_jabon", isMiscible=true, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="vinagre", topicId="reacciones", name="Vinagre", symbolOrFormula="Ácido acético diluido", state=MatterState.LIQUIDO, colorHex="#FFF59D", description="Líquido de olor fuerte que reacciona con el bicarbonato produciendo burbujas.", iconKey="sub_vinagre", isMiscible=true, isMagneticConceptual=false, densityTier=2),
+        VirtualSubstance(id="bicarbonato", topicId="reacciones", name="Bicarbonato de sodio", symbolOrFormula="NaHCO3", state=MatterState.SOLIDO, colorHex="#FAFAFA", description="Polvo blanco que, al mezclarse con vinagre, libera burbujas de gas de forma segura.", iconKey="sub_bicarbonato", isMiscible=true, isMagneticConceptual=false, densityTier=3),
+    )
+}

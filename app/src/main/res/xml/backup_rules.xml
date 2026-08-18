@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- QuimicAtomix: copia de seguridad únicamente de la base de datos local del jugador. -->
+<full-backup-content>
+    <include domain="database" path="quimicatomix.db" />
+</full-backup-content>

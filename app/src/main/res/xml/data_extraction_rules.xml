@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- QuimicAtomix: no se transfieren datos a la nube; solo migración dispositivo-a-dispositivo local. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="quimicatomix.db" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="quimicatomix.db" />
+    </device-transfer>
+</data-extraction-rules>

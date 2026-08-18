@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paleta QuimicAtomix: "laboratorio nocturno luminoso" -->
+    <color name="lab_navy_900">#10163A</color>
+    <color name="lab_navy_800">#161B45</color>
+    <color name="lab_navy_700">#1E2559</color>
+    <color name="lab_teal_500">#14C7B4</color>
+    <color name="lab_teal_300">#5EEBDB</color>
+    <color name="lab_blue_500">#2E7DFF</color>
+    <color name="lab_violet_500">#8B5CF6</color>
+    <color name="lab_coral_500">#FF6B4A</color>
+    <color name="lab_lime_500">#7ED957</color>
+    <color name="lab_gold_500">#FFC145</color>
+    <color name="lab_white">#F6F8FF</color>
+    <color name="lab_ink">#0B0F2A</color>
+</resources>
