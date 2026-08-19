@@ -135,50 +135,77 @@ fun DraggableTile(
     onDropped: (zoneId: String?) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val offsetX = remember { Animatable(0f) }
-    val offsetY = remember { Animatable(0f) }
+    // Mientras se arrastra, el offset se lleva en estado PLANO (escritura síncrona, sin
+    // corrutina) para que no haya ninguna condición de carrera: cada evento onDrag llega en
+    // orden y actualiza el valor inmediatamente. El Animatable solo entra en juego UNA VEZ,
+    // al soltar, para la animación de "volver a su lugar" (antes, cada evento de arrastre
+    // lanzaba su propia corrutina para animar el offset, y con varias en vuelo a la vez
+    // podían pisarse entre sí, perdiendo movimientos y dejando el tile en una posición
+    // incorrecta — por eso a veces no aterrizaba en la casilla correcta o no se soltaba).
+    var dragOffsetX by remember { mutableStateOf(0f) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
+    val snapX = remember { Animatable(0f) }
+    val snapY = remember { Animatable(0f) }
+    var dragging by remember { mutableStateOf(false) }
     // Centro REAL en pantalla del tile, actualizado en cada pase de layout. Se coloca
     // onGloballyPositioned DESPUÉS de offset en la cadena de modificadores a propósito:
     // así refleja la posición ya desplazada mientras se arrastra, no la posición de reposo
     // (si fuera antes de offset, siempre reportaría la posición sin arrastrar y el
     // arrastre nunca acertaría ninguna zona).
     var liveCenter by remember { mutableStateOf<Offset?>(null) }
-    var dragging by remember { mutableStateOf(false) }
+
+    val renderX = if (dragging) dragOffsetX else snapX.value
+    val renderY = if (dragging) dragOffsetY else snapY.value
+
+    fun releaseAndSnapBack() {
+        val fromX = dragOffsetX
+        val fromY = dragOffsetY
+        dragOffsetX = 0f
+        dragOffsetY = 0f
+        scope.launch {
+            snapX.snapTo(fromX)
+            snapY.snapTo(fromY)
+            val spec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy)
+            launch { snapX.animateTo(0f, animationSpec = spec) }
+            launch { snapY.animateTo(0f, animationSpec = spec) }
+        }
+    }
 
     Box(
         modifier = modifier
             .then(
                 if (enabled) {
-                    Modifier.pointerInput(zones.size) {
+                    Modifier.pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { dragging = true },
+                            onDragStart = {
+                                dragOffsetX = 0f
+                                dragOffsetY = 0f
+                                dragging = true
+                            },
                             onDragEnd = {
                                 dragging = false
                                 val center = liveCenter
                                 val hitZone = center?.let { c ->
                                     zones.entries.firstOrNull { (_, rect) -> rect.contains(c) }?.key
                                 }
-                                val snapSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy)
-                                scope.launch { offsetX.animateTo(0f, animationSpec = snapSpec) }
-                                scope.launch { offsetY.animateTo(0f, animationSpec = snapSpec) }
+                                releaseAndSnapBack()
                                 onDropped(hitZone)
                             },
                             onDragCancel = {
                                 dragging = false
-                                scope.launch { offsetX.snapTo(0f) }
-                                scope.launch { offsetY.snapTo(0f) }
+                                releaseAndSnapBack()
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                scope.launch { offsetX.snapTo(offsetX.value + dragAmount.x) }
-                                scope.launch { offsetY.snapTo(offsetY.value + dragAmount.y) }
+                                dragOffsetX += dragAmount.x
+                                dragOffsetY += dragAmount.y
                             }
                         )
                     }
                 } else Modifier
             )
             .offset {
-                IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt())
+                IntOffset(renderX.roundToInt(), renderY.roundToInt())
             }
             .onGloballyPositioned { coordinates ->
                 liveCenter = coordinates.boundsInWindow().center

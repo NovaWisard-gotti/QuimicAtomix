@@ -67,6 +67,32 @@ private fun substanceColor(text: String): Color {
     }
 }
 
+/** Traduce un nombre de color en español al [Color] real, para que la animación de cambio
+ * de color termine EXACTAMENTE en el color que dice la respuesta correcta (p.ej. "rosado"),
+ * en vez de un degradado fijo que puede no coincidir con ninguna opción mostrada. */
+private fun namedColor(text: String): Color? {
+    val t = text.lowercase()
+    return when {
+        "rosad" in t || "rosa" in t -> Color(0xFFF06BAF)
+        "rojo" in t -> Color(0xFFE53935)
+        "verde" in t -> Color(0xFF4CAF50)
+        "azul" in t -> Color(0xFF2E7DFF)
+        "morad" in t || "violeta" in t -> LabViolet500
+        "naranja" in t -> Color(0xFFFF8A34)
+        "amarill" in t -> Color(0xFFFFC107)
+        "marron" in t || "café" in t || "cafe" in t -> Color(0xFF6B4226)
+        else -> null
+    }
+}
+
+/** Cantidad pequeña mencionada en el texto (p.ej. "3" capas, "2" hidrógenos): se usa para
+ * que la animación de órbitas dibuje EXACTAMENTE esa cantidad de satélites en vez de un
+ * número fijo que puede no coincidir con lo que dice el enunciado. */
+private fun mentionedCount(text: String): Int? {
+    val n = text.trim().toIntOrNull()
+    return if (n != null && n in 1..8) n else null
+}
+
 /**
  * Animación genérica (sin autoría por experimento) mostrada en pasos OBSERVAR: elige una de
  * cuatro "familias" según palabras clave del propio texto del paso, y se puede repetir con
@@ -93,8 +119,8 @@ fun ObservationAnimation(
             when (family) {
                 AnimationFamily.PHASE_CHANGE -> PhaseChangeAnimation(playToken, tint)
                 AnimationFamily.FIZZ -> FizzAnimation()
-                AnimationFamily.COLOR_SHIFT -> ColorShiftAnimation(playToken)
-                AnimationFamily.ORBIT -> OrbitAnimation()
+                AnimationFamily.COLOR_SHIFT -> ColorShiftAnimation(playToken, correctAnswerCsv)
+                AnimationFamily.ORBIT -> OrbitAnimation(correctAnswerCsv)
             }
         }
         TextButton(onClick = { playToken++ }) {
@@ -199,13 +225,16 @@ private fun FizzAnimation() {
 }
 
 @Composable
-private fun ColorShiftAnimation(playToken: Int) {
+private fun ColorShiftAnimation(playToken: Int, correctAnswerCsv: String) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(playToken) {
         progress.snapTo(0f)
         progress.animateTo(1f, animationSpec = tween(durationMillis = 1800, easing = LinearEasing))
     }
-    val mixed = lerpColor(LabViolet500, LabCoral500, progress.value)
+    // Termina EXACTAMENTE en el color de la respuesta correcta (si se reconoce la palabra),
+    // no en un degradado fijo que podía no coincidir con ninguna opción mostrada.
+    val target = remember(correctAnswerCsv) { namedColor(correctAnswerCsv) ?: LabCoral500 }
+    val mixed = lerpColor(LabViolet500, target, progress.value)
     LabIllustration(kind = IllustrationKind.BEAKER, primaryColor = mixed, sizeDp = 100)
 }
 
@@ -219,19 +248,43 @@ private fun lerpColor(start: Color, end: Color, fraction: Float): Color {
     )
 }
 
+/**
+ * Dibuja exactamente [satelliteCount] puntos orbitando un núcleo central (derivado de
+ * correctAnswerCsv, p.ej. "3" capas de electrones o "2" hidrógenos): antes mostraba una
+ * molécula genérica con una cantidad fija de puntos que no coincidía con lo que decía el
+ * enunciado.
+ */
 @Composable
-private fun OrbitAnimation() {
+private fun OrbitAnimation(correctAnswerCsv: String) {
+    val satelliteCount = remember(correctAnswerCsv) { mentionedCount(correctAnswerCsv) ?: 3 }
     val transition = rememberInfiniteTransition(label = "orbitObservation")
-    val rotation by transition.animateFloat(
+    val rotationDeg by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(4200, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(5200, easing = LinearEasing), repeatMode = RepeatMode.Restart),
         label = "orbitRotation"
     )
-    Box(
-        modifier = Modifier.graphicsLayer { rotationZ = rotation },
-        contentAlignment = Alignment.Center
-    ) {
-        LabIllustration(kind = IllustrationKind.MOLECULE, primaryColor = LabTeal500, sizeDp = 100)
+    Canvas(modifier = Modifier.size(140.dp)) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val cy = h / 2f
+        val orbitRadiusX = w * 0.36f
+        val orbitRadiusY = h * 0.36f
+
+        drawCircle(
+            color = LabWhite.copy(alpha = 0.2f),
+            radius = orbitRadiusX,
+            center = Offset(cx, cy),
+            style = Stroke(width = 2f)
+        )
+        drawCircle(color = LabTeal500, radius = w * 0.11f, center = Offset(cx, cy))
+
+        for (i in 0 until satelliteCount) {
+            val angle = Math.toRadians((rotationDeg + i * (360f / satelliteCount)).toDouble())
+            val sx = cx + (orbitRadiusX * kotlin.math.cos(angle)).toFloat()
+            val sy = cy + (orbitRadiusY * kotlin.math.sin(angle)).toFloat()
+            drawCircle(color = LabCoral500, radius = w * 0.045f, center = Offset(sx, sy))
+        }
     }
 }

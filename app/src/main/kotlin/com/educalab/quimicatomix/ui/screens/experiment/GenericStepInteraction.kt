@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,9 +19,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +37,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.educalab.quimicatomix.data.local.entity.ExperimentStep
 import com.educalab.quimicatomix.data.local.entity.InteractionType
@@ -45,8 +50,10 @@ import com.educalab.quimicatomix.ui.components.rememberDropZoneRegistry
 import com.educalab.quimicatomix.ui.theme.LabInk
 import com.educalab.quimicatomix.ui.theme.LabNavy700
 import com.educalab.quimicatomix.ui.theme.LabNavy800
+import com.educalab.quimicatomix.ui.theme.LabTeal300
 import com.educalab.quimicatomix.ui.theme.LabTeal500
 import com.educalab.quimicatomix.ui.theme.LabWhite
+import kotlin.math.roundToInt
 
 /**
  * Interacción genérica de un paso de experimento: cada [InteractionType] se traduce en una
@@ -66,6 +73,7 @@ fun GenericStepInteraction(step: ExperimentStep, onSubmit: (String) -> Unit) {
         }
         InteractionType.CONECTAR -> ConnectInteraction(step.id, step.correctAnswerCsv, onSubmit)
         InteractionType.OBSERVAR -> ObserveInteraction(step, options, onSubmit)
+        InteractionType.CONFIGURAR -> ConfigureInteraction(step.id, options, onSubmit)
         InteractionType.SELECCION_IMAGEN -> {
             // Algunos pasos SELECCION_IMAGEN en realidad piden clasificar cada opción en una
             // categoría (p.ej. hielo/agua_liquida/vapor -> solido/liquido/gaseoso): el
@@ -84,14 +92,27 @@ fun GenericStepInteraction(step: ExperimentStep, onSubmit: (String) -> Unit) {
     }
 }
 
-/** Layout simple en filas de tarjetas, sin desplazamiento (evita conflictos de gesto con el arrastre). */
+/**
+ * Cuadrícula que se ajusta sola (sin desplazamiento, para no pelear con el gesto de
+ * arrastre) donde CADA elemento vive bajo el MISMO padre y con [key] por su propio texto.
+ * Esto es crítico: antes se armaban filas manuales con `chunked()`, así que cuando la
+ * bandeja de opciones perdía un elemento (al soltarlo en una zona), Compose reutilizaba las
+ * "casillas" de composición por POSICIÓN, no por identidad — y un tile arrastrable heredaba
+ * el estado interno (offset, si estaba siendo arrastrado, su gesto en curso) del elemento
+ * que antes ocupaba ese lugar. Eso causaba exactamente los síntomas reportados: grupos que
+ * se "bloqueaban", opciones que cambiaban solas o que aparecían repetidas. Con todos los
+ * elementos como hermanos directos bajo un solo FlowRow y con [key], Compose asocia el
+ * estado recordado a la identidad real del elemento sin importar cómo se reacomode la lista.
+ */
 @Composable
-private fun TileRows(items: List<String>, itemsPerRow: Int = 3, content: @Composable (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.chunked(itemsPerRow).forEach { rowItems ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                rowItems.forEach { item -> content(item) }
-            }
+private fun TileRows(items: List<String>, content: @Composable (String) -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items.forEach { item ->
+            key(item) { content(item) }
         }
     }
 }
@@ -203,7 +224,7 @@ private fun ClassifyInteraction(stepId: Long, options: List<String>, groupCount:
                     if (groupItems.isEmpty()) {
                         Text("Suelta aquí", color = LabWhite.copy(alpha = 0.3f), style = MaterialTheme.typography.bodyMedium)
                     } else {
-                        TileRows(items = groupItems, itemsPerRow = 3) { item ->
+                        TileRows(items = groupItems) { item ->
                             VisualAnswerTile(
                                 label = item,
                                 kind = IconCatalog.resolve(item),
@@ -425,6 +446,51 @@ private fun ObserveInteraction(step: ExperimentStep, options: List<String>, onSu
         )
         Spacer(Modifier.padding(top = 12.dp))
         SelectInteraction(options, onSubmit)
+    }
+}
+
+/** El paso CONFIGURAR pide explícitamente "mueve el control": antes caía en la selección
+ * genérica por toque (sin ningún control), lo cual contradecía el enunciado. Aquí se
+ * muestra un control deslizante real con una posición discreta por cada opción. */
+@Composable
+private fun ConfigureInteraction(stepId: Long, options: List<String>, onSubmit: (String) -> Unit) {
+    var index by remember(stepId) { mutableStateOf(0) }
+    val maxIndex = (options.size - 1).coerceAtLeast(0)
+
+    Column {
+        Text("Mueve el control para elegir tu respuesta:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.padding(top = 16.dp))
+        Text(
+            options.getOrElse(index) { "" }.replace('_', ' '),
+            style = MaterialTheme.typography.headlineSmall,
+            color = LabTeal300,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.padding(top = 8.dp))
+        Slider(
+            value = index.toFloat(),
+            onValueChange = { index = it.roundToInt().coerceIn(0, maxIndex) },
+            valueRange = 0f..maxIndex.toFloat(),
+            steps = (maxIndex - 1).coerceAtLeast(0),
+            colors = SliderDefaults.colors(thumbColor = LabTeal500, activeTrackColor = LabTeal500, inactiveTrackColor = LabNavy700)
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            options.forEach { option ->
+                Text(
+                    option.replace('_', ' '),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LabWhite.copy(alpha = 0.55f)
+                )
+            }
+        }
+        Spacer(Modifier.padding(top = 20.dp))
+        Button(
+            onClick = { onSubmit(options.getOrElse(index) { "" }) },
+            enabled = options.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
+        ) { Text("Comprobar", fontWeight = FontWeight.Bold) }
     }
 }
 
