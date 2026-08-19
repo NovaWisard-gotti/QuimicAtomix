@@ -104,6 +104,7 @@ fun GenericStepInteraction(step: ExperimentStep, onSubmit: (String) -> Unit) {
  * elementos como hermanos directos bajo un solo FlowRow y con [key], Compose asocia el
  * estado recordado a la identidad real del elemento sin importar cómo se reacomode la lista.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun TileRows(items: List<String>, content: @Composable (String) -> Unit) {
     FlowRow(
