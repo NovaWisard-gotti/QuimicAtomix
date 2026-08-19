@@ -66,6 +66,20 @@ fun GenericStepInteraction(step: ExperimentStep, onSubmit: (String) -> Unit) {
         }
         InteractionType.CONECTAR -> ConnectInteraction(step.id, step.correctAnswerCsv, onSubmit)
         InteractionType.OBSERVAR -> ObserveInteraction(step, options, onSubmit)
+        InteractionType.SELECCION_IMAGEN -> {
+            // Algunos pasos SELECCION_IMAGEN en realidad piden clasificar cada opción en una
+            // categoría (p.ej. hielo/agua_liquida/vapor -> solido/liquido/gaseoso): el
+            // vocabulario de correctAnswerCsv no comparte NINGÚN valor con optionsCsv y tiene
+            // más de un elemento. En ese caso el enunciado dice "arrastra" y se necesita un
+            // arrastre real a zonas fijas; el resto sigue siendo selección simple por toque.
+            val labels = remember(step.id) { step.correctAnswerCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() } }
+            val isClassifyByLabel = remember(step.id) { labels.size > 1 && labels.none { it in options } }
+            if (isClassifyByLabel) {
+                ClassifyToLabelsInteraction(step.id, options, labels, onSubmit)
+            } else {
+                SelectInteraction(options, onSubmit)
+            }
+        }
         else -> SelectInteraction(options, onSubmit)
     }
 }
@@ -229,6 +243,90 @@ private fun ClassifyInteraction(stepId: Long, options: List<String>, groupCount:
                 onSubmit(groups.joinToString("|"))
             },
             enabled = assignment.size == options.size,
+            colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
+        ) { Text("Comprobar", fontWeight = FontWeight.Bold) }
+    }
+}
+
+/** Arrastra cada opción a una de las zonas fijas (una por cada valor esperado). */
+@Composable
+private fun ClassifyToLabelsInteraction(stepId: Long, options: List<String>, labels: List<String>, onSubmit: (String) -> Unit) {
+    var tray by remember(stepId) { mutableStateOf(options) }
+    var assignment by remember(stepId) { mutableStateOf(mapOf<String, String>()) } // item -> label
+    val zones = rememberDropZoneRegistry()
+
+    Column {
+        Text("Arrastra cada imagen al lugar que le corresponde:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.padding(top = 10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            labels.forEachIndexed { index, label ->
+                val assignedItem = assignment.entries.firstOrNull { it.value == label }?.key
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(120.dp)
+                        .registerDropZone("label_$index", zones)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(LabNavy800)
+                        .border(width = 1.dp, color = LabNavy700, shape = RoundedCornerShape(16.dp))
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        label.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = LabWhite.copy(alpha = 0.75f),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                    Spacer(Modifier.padding(top = 6.dp))
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (assignedItem != null) {
+                            VisualAnswerTile(
+                                label = assignedItem,
+                                kind = IconCatalog.resolve(assignedItem),
+                                tint = IconCatalog.colorFor(assignedItem),
+                                selected = true,
+                                onClick = {
+                                    assignment = assignment - assignedItem
+                                    tray = tray + assignedItem
+                                }
+                            )
+                        } else {
+                            Text("Suelta aquí", color = LabWhite.copy(alpha = 0.3f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.padding(top = 16.dp))
+        if (tray.isNotEmpty()) {
+            Text("Opciones disponibles:", style = MaterialTheme.typography.bodyMedium, color = LabWhite.copy(alpha = 0.7f))
+            Spacer(Modifier.padding(top = 8.dp))
+        }
+        TileRows(items = tray) { item ->
+            DraggableTile(
+                label = item,
+                kind = IconCatalog.resolve(item),
+                tint = IconCatalog.colorFor(item),
+                zones = zones,
+                onDropped = { zoneId ->
+                    val index = zoneId?.removePrefix("label_")?.toIntOrNull()
+                    if (index != null) {
+                        val label = labels[index]
+                        val alreadyUsed = assignment.containsValue(label)
+                        if (!alreadyUsed) {
+                            assignment = assignment + (item to label)
+                            tray = tray - item
+                        }
+                    }
+                }
+            )
+        }
+        Spacer(Modifier.padding(top = 16.dp))
+        Button(
+            onClick = { onSubmit(assignment.values.joinToString(",")) },
+            enabled = tray.isEmpty() && assignment.size == labels.size,
             colors = ButtonDefaults.buttonColors(containerColor = LabTeal500, contentColor = LabInk)
         ) { Text("Comprobar", fontWeight = FontWeight.Bold) }
     }

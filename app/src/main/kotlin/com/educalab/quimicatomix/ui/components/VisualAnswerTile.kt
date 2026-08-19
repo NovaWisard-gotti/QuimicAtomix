@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
@@ -138,17 +137,16 @@ fun DraggableTile(
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
     val offsetY = remember { Animatable(0f) }
-    var restingOrigin by remember { mutableStateOf(Offset.Zero) }
-    var tileSize by remember { mutableStateOf(Size.Zero) }
+    // Centro REAL en pantalla del tile, actualizado en cada pase de layout. Se coloca
+    // onGloballyPositioned DESPUÉS de offset en la cadena de modificadores a propósito:
+    // así refleja la posición ya desplazada mientras se arrastra, no la posición de reposo
+    // (si fuera antes de offset, siempre reportaría la posición sin arrastrar y el
+    // arrastre nunca acertaría ninguna zona).
+    var liveCenter by remember { mutableStateOf<Offset?>(null) }
     var dragging by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
-            .onGloballyPositioned { coordinates ->
-                val bounds = coordinates.boundsInWindow()
-                tileSize = bounds.size
-                restingOrigin = Offset(bounds.left - offsetX.value, bounds.top - offsetY.value)
-            }
             .then(
                 if (enabled) {
                     Modifier.pointerInput(zones.size) {
@@ -156,11 +154,10 @@ fun DraggableTile(
                             onDragStart = { dragging = true },
                             onDragEnd = {
                                 dragging = false
-                                val center = Offset(
-                                    restingOrigin.x + offsetX.value + tileSize.width / 2f,
-                                    restingOrigin.y + offsetY.value + tileSize.height / 2f
-                                )
-                                val hitZone = zones.entries.firstOrNull { (_, rect) -> rect.contains(center) }?.key
+                                val center = liveCenter
+                                val hitZone = center?.let { c ->
+                                    zones.entries.firstOrNull { (_, rect) -> rect.contains(c) }?.key
+                                }
                                 val snapSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy)
                                 scope.launch { offsetX.animateTo(0f, animationSpec = snapSpec) }
                                 scope.launch { offsetY.animateTo(0f, animationSpec = snapSpec) }
@@ -182,6 +179,9 @@ fun DraggableTile(
             )
             .offset {
                 IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt())
+            }
+            .onGloballyPositioned { coordinates ->
+                liveCenter = coordinates.boundsInWindow().center
             }
             .zIndex(if (dragging) 4f else 0f)
     ) {

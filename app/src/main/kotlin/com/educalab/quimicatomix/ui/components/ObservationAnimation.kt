@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
@@ -21,7 +22,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,6 +53,20 @@ private fun classifyFamily(vararg texts: String): AnimationFamily {
     }
 }
 
+/** Color de la sustancia según palabras clave del propio texto, para que la animación de
+ * cambio de fase se vea como la sustancia real (chocolate marrón, cera dorada...) en vez de
+ * un color genérico sin relación con el enunciado. */
+private fun substanceColor(text: String): Color {
+    val t = text.lowercase()
+    return when {
+        "chocolate" in t -> Color(0xFF6B4226)
+        "cera" in t || "vela" in t -> Color(0xFFE8B84B)
+        "mantequilla" in t -> Color(0xFFF3D67A)
+        "hierro" in t -> Color(0xFFB0B7BF)
+        else -> LabTeal300
+    }
+}
+
 /**
  * Animación genérica (sin autoría por experimento) mostrada en pasos OBSERVAR: elige una de
  * cuatro "familias" según palabras clave del propio texto del paso, y se puede repetir con
@@ -62,12 +83,15 @@ fun ObservationAnimation(
     val family = remember(instructionText, optionsCsv, correctAnswerCsv) {
         classifyFamily(instructionText, optionsCsv, correctAnswerCsv)
     }
+    val tint = remember(instructionText, optionsCsv, correctAnswerCsv) {
+        substanceColor("$instructionText $optionsCsv $correctAnswerCsv")
+    }
     var playToken by remember { mutableStateOf(0) }
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
             when (family) {
-                AnimationFamily.PHASE_CHANGE -> PhaseChangeAnimation(playToken)
+                AnimationFamily.PHASE_CHANGE -> PhaseChangeAnimation(playToken, tint)
                 AnimationFamily.FIZZ -> FizzAnimation()
                 AnimationFamily.COLOR_SHIFT -> ColorShiftAnimation(playToken)
                 AnimationFamily.ORBIT -> OrbitAnimation()
@@ -79,45 +103,65 @@ fun ObservationAnimation(
     }
 }
 
+/**
+ * Un solo bloque sólido que se aplana y ensancha hasta volverse un charco (con un par de
+ * gotas y un poco de vapor al final) — en vez de intercambiar íconos sueltos, es UNA forma
+ * que cambia continuamente, para que de verdad se vea como algo derritiéndose.
+ */
 @Composable
-private fun PhaseChangeAnimation(playToken: Int) {
+private fun PhaseChangeAnimation(playToken: Int, tint: Color) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(playToken) {
         progress.snapTo(0f)
-        progress.animateTo(1f, animationSpec = tween(durationMillis = 2200, easing = LinearEasing))
+        progress.animateTo(1f, animationSpec = tween(durationMillis = 2600, easing = LinearEasing))
     }
     val p = progress.value
-    val iceAlpha = (1f - p / 0.5f).coerceIn(0f, 1f)
-    val liquidAlpha = ((p - 0.2f) / 0.5f).coerceIn(0f, 1f)
-    val steamProgress = ((p - 0.55f) / 0.45f).coerceIn(0f, 1f)
 
-    Box(contentAlignment = Alignment.Center) {
-        LabIllustration(
-            kind = IllustrationKind.STEAM_CLOUD,
-            primaryColor = LabWhite,
-            sizeDp = 60,
-            modifier = Modifier.graphicsLayer {
-                alpha = steamProgress * 0.85f
-                translationY = -70f * steamProgress
+    Canvas(modifier = Modifier.size(140.dp)) {
+        val w = size.width
+        val h = size.height
+        val baseY = h * 0.78f
+
+        val blockWidth = w * (0.34f + 0.32f * p)
+        val blockHeight = h * (0.44f - 0.32f * p)
+        val cornerRadius = w * (0.05f + 0.14f * p)
+        val left = (w - blockWidth) / 2f
+        val top = baseY - blockHeight
+
+        drawLine(
+            color = LabWhite.copy(alpha = 0.25f),
+            start = Offset(w * 0.12f, baseY),
+            end = Offset(w * 0.88f, baseY),
+            strokeWidth = 3f
+        )
+
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(left, top),
+            size = Size(blockWidth, blockHeight),
+            cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+        )
+        drawRoundRect(
+            color = LabWhite.copy(alpha = 0.16f * (1f - p * 0.6f)),
+            topLeft = Offset(left + blockWidth * 0.14f, top + blockHeight * 0.16f),
+            size = Size(blockWidth * 0.28f, blockHeight * 0.3f),
+            cornerRadius = CornerRadius(cornerRadius * 0.5f, cornerRadius * 0.5f)
+        )
+
+        if (p > 0.3f) {
+            val dropAlpha = ((p - 0.3f) / 0.35f).coerceIn(0f, 1f)
+            drawCircle(tint.copy(alpha = dropAlpha), radius = w * 0.02f, center = Offset(left + blockWidth * 0.1f, baseY + h * 0.02f))
+            drawCircle(tint.copy(alpha = dropAlpha * 0.8f), radius = w * 0.015f, center = Offset(left + blockWidth * 0.9f, baseY + h * 0.03f))
+        }
+
+        if (p > 0.6f) {
+            val steamP = ((p - 0.6f) / 0.4f).coerceIn(0f, 1f)
+            val wisp = Path().apply {
+                moveTo(w * 0.5f, top - h * 0.02f)
+                quadraticBezierTo(w * 0.58f, top - h * (0.12f + steamP * 0.08f), w * 0.5f, top - h * (0.24f + steamP * 0.14f))
             }
-        )
-        LabIllustration(
-            kind = IllustrationKind.BUBBLE_JAR,
-            primaryColor = LabTeal500,
-            sizeDp = 92,
-            modifier = Modifier.graphicsLayer { alpha = liquidAlpha }
-        )
-        LabIllustration(
-            kind = IllustrationKind.ICE_CUBE,
-            primaryColor = LabTeal300,
-            sizeDp = 92,
-            modifier = Modifier.graphicsLayer {
-                alpha = iceAlpha
-                val squash = 1f - 0.35f * (1f - iceAlpha)
-                scaleX = squash + 0.15f
-                scaleY = squash
-            }
-        )
+            drawPath(wisp, color = LabWhite.copy(alpha = steamP * 0.55f), style = Stroke(width = 4f, cap = StrokeCap.Round))
+        }
     }
 }
 
