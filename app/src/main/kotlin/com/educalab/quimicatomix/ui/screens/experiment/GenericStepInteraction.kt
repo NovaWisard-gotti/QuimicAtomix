@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.educalab.quimicatomix.data.local.entity.ExperimentStep
 import com.educalab.quimicatomix.data.local.entity.InteractionType
+import com.educalab.quimicatomix.ui.components.ConfigureAnimation
 import com.educalab.quimicatomix.ui.components.DraggableTile
 import com.educalab.quimicatomix.ui.components.IconCatalog
 import com.educalab.quimicatomix.ui.components.ObservationAnimation
@@ -460,7 +461,11 @@ private fun ConfigureInteraction(stepId: Long, options: List<String>, onSubmit: 
 
     Column {
         Text("Mueve el control para elegir tu respuesta:", style = MaterialTheme.typography.titleMedium, color = LabWhite, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.padding(top = 16.dp))
+        Spacer(Modifier.padding(top = 12.dp))
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ConfigureAnimation(options = options, selectedIndex = index)
+        }
+        Spacer(Modifier.padding(top = 8.dp))
         Text(
             options.getOrElse(index) { "" }.replace('_', ' '),
             style = MaterialTheme.typography.headlineSmall,

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -37,6 +38,7 @@ import com.educalab.quimicatomix.ui.theme.LabTeal300
 import com.educalab.quimicatomix.ui.theme.LabTeal500
 import com.educalab.quimicatomix.ui.theme.LabViolet500
 import com.educalab.quimicatomix.ui.theme.LabWhite
+import kotlin.math.roundToInt
 
 private enum class AnimationFamily { PHASE_CHANGE, FIZZ, COLOR_SHIFT, ORBIT }
 
@@ -285,6 +287,131 @@ private fun OrbitAnimation(correctAnswerCsv: String) {
             val sx = cx + (orbitRadiusX * kotlin.math.cos(angle)).toFloat()
             val sy = cy + (orbitRadiusY * kotlin.math.sin(angle)).toFloat()
             drawCircle(color = LabCoral500, radius = w * 0.045f, center = Offset(sx, sy))
+        }
+    }
+}
+
+private enum class ConfigureFamily { THERMOMETER, INTENSITY }
+
+private fun classifyConfigureFamily(options: List<String>): ConfigureFamily {
+    val t = options.joinToString(" ").lowercase()
+    val thermoWords = listOf("frio", "caliente", "templado", "congela", "temperatura")
+    return if (thermoWords.any { it in t }) ConfigureFamily.THERMOMETER else ConfigureFamily.INTENSITY
+}
+
+/**
+ * Visual en vivo para pasos CONFIGURAR: antes el control deslizante solo cambiaba una
+ * palabra de texto, sin mostrar ningún efecto — igual que "mueve el control" prometía algo
+ * que no pasaba. Ahora, según a qué se refieran las opciones, se ve un termómetro cuyo
+ * nivel/color sigue la posición del control (temperatura) o un frasco cuya cantidad de
+ * burbujas y velocidad aumentan con la posición (intensidad/cantidad) — reactivo en vivo
+ * mientras se arrastra, sin necesidad de un botón de "reproducir".
+ */
+@Composable
+fun ConfigureAnimation(options: List<String>, selectedIndex: Int, modifier: Modifier = Modifier) {
+    val maxIndex = (options.size - 1).coerceAtLeast(1)
+    val fraction = (selectedIndex.toFloat() / maxIndex).coerceIn(0f, 1f)
+    val family = remember(options) { classifyConfigureFamily(options) }
+    Box(modifier = modifier.size(140.dp), contentAlignment = Alignment.Center) {
+        when (family) {
+            ConfigureFamily.THERMOMETER -> ThermometerVisual(fraction)
+            ConfigureFamily.INTENSITY -> IntensityBubblesVisual(fraction)
+        }
+    }
+}
+
+@Composable
+private fun ThermometerVisual(fraction: Float) {
+    val animatedFraction by animateFloatAsState(targetValue = fraction, label = "thermo")
+    val mercuryColor = lerpColor(Color(0xFF5EC8E8), Color(0xFFE5533D), animatedFraction)
+
+    Canvas(modifier = Modifier.size(140.dp)) {
+        val w = size.width
+        val h = size.height
+        val tubeWidth = w * 0.14f
+        val tubeTop = h * 0.12f
+        val tubeBottom = h * 0.72f
+        val bulbRadius = w * 0.14f
+        val bulbCenter = Offset(w * 0.5f, h * 0.8f)
+        val tubeLeft = w * 0.5f - tubeWidth / 2f
+
+        drawRoundRect(
+            color = LabWhite.copy(alpha = 0.25f),
+            topLeft = Offset(tubeLeft, tubeTop),
+            size = Size(tubeWidth, tubeBottom - tubeTop),
+            cornerRadius = CornerRadius(tubeWidth / 2f, tubeWidth / 2f),
+            style = Stroke(width = 3f)
+        )
+        drawCircle(LabWhite.copy(alpha = 0.25f), radius = bulbRadius, center = bulbCenter, style = Stroke(width = 3f))
+
+        val fillHeight = (tubeBottom - tubeTop) * (0.15f + 0.75f * animatedFraction)
+        drawRoundRect(
+            color = mercuryColor,
+            topLeft = Offset(tubeLeft, tubeBottom - fillHeight),
+            size = Size(tubeWidth, fillHeight),
+            cornerRadius = CornerRadius(tubeWidth / 2f, tubeWidth / 2f)
+        )
+        drawCircle(mercuryColor, radius = bulbRadius * 0.82f, center = bulbCenter)
+
+        if (animatedFraction < 0.2f) {
+            val iceAlpha = 1f - animatedFraction / 0.2f
+            drawLine(
+                LabWhite.copy(alpha = iceAlpha * 0.8f),
+                Offset(bulbCenter.x - bulbRadius * 1.4f, bulbCenter.y),
+                Offset(bulbCenter.x - bulbRadius * 0.6f, bulbCenter.y),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                LabWhite.copy(alpha = iceAlpha * 0.8f),
+                Offset(bulbCenter.x + bulbRadius * 0.6f, bulbCenter.y),
+                Offset(bulbCenter.x + bulbRadius * 1.4f, bulbCenter.y),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round
+            )
+        }
+        if (animatedFraction > 0.8f) {
+            val heatAlpha = (animatedFraction - 0.8f) / 0.2f
+            val wave = Path().apply {
+                moveTo(w * 0.5f, tubeTop - h * 0.02f)
+                quadraticBezierTo(w * 0.58f, tubeTop - h * 0.1f, w * 0.5f, tubeTop - h * 0.18f)
+            }
+            drawPath(wave, color = mercuryColor.copy(alpha = heatAlpha * 0.6f), style = Stroke(width = 3f, cap = StrokeCap.Round))
+        }
+    }
+}
+
+@Composable
+private fun IntensityBubblesVisual(fraction: Float) {
+    val bubbleCount = (1 + (fraction * 6).roundToInt()).coerceIn(1, 7)
+    val durationMs = (2000 - (1300 * fraction)).roundToInt().coerceAtLeast(600)
+    val transition = rememberInfiniteTransition(label = "intensity")
+    Box(contentAlignment = Alignment.Center) {
+        LabIllustration(kind = IllustrationKind.BUBBLE_JAR, primaryColor = LabTeal500, sizeDp = 100)
+        repeat(bubbleCount) { index ->
+            val delayMs = index * (durationMs / (bubbleCount + 1)).coerceAtLeast(80)
+            val riseFraction by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    tween(durationMs, delayMillis = delayMs, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "intensityBubble$index"
+            )
+            val xOffset = (index - bubbleCount / 2) * 12f
+            LabIllustration(
+                kind = IllustrationKind.DROPLET,
+                primaryColor = LabWhite,
+                sizeDp = 12,
+                modifier = Modifier.graphicsLayer {
+                    alpha = (1f - riseFraction) * 0.9f
+                    translationY = -60f * riseFraction
+                    translationX = xOffset
+                    scaleX = 0.6f + 0.4f * riseFraction
+                    scaleY = 0.6f + 0.4f * riseFraction
+                }
+            )
         }
     }
 }
